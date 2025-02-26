@@ -1,0 +1,42 @@
+import os
+import pysftp
+import configparser
+import glob
+
+# Load credentials from the config file
+creds_file = r'/home/spark/main_config/master_config_file.ini'
+creds = configparser.ConfigParser()
+creds.read(creds_file)
+
+# ExaVault FTP Credentials
+sftp_host = creds['bi-sftp']['hostname']
+sftp_user = creds['bi-sftp']['username']
+sftp_pass = creds['bi-sftp']['password']
+
+# Files to look for in the directory
+desired_files = ['NMT Agent Incentive Weekly.csv', 'NMT FM_RM Incentive Cumulative.csv', 
+                'NMT FM Incentive Weekly.csv', 'NMT Agent Incentive Cumulative.csv']
+
+# Get all files in the directory and filter for desired files
+filelist = [f for f in glob.glob(os.path.join('/var/working/bell/input/', '*.*')) if os.path.basename(f) in desired_files]
+
+ftp_destination_path = '/perx/In/cumulativesales'
+
+def transfer_files_to_ftp(files, ftp_destination_path):
+    cnopts = pysftp.CnOpts()
+    cnopts.hostkeys = None  # Disables host key checking
+
+    with pysftp.Connection(sftp_host, username=sftp_user, password=sftp_pass, cnopts=cnopts) as ftp:
+        ftp.cwd(ftp_destination_path)  # Change to the destination directory
+        
+        for file_path in files:
+            folder_path, file_name = os.path.split(file_path)  # Split folder and file name
+            
+            if os.path.exists(file_path):
+                ftp.put(file_path)  # Upload the file
+                print(f'File {file_name} from {folder_path} successfully uploaded to {ftp_destination_path}')
+            else:
+                print(f'File {file_name} from {folder_path} not found.')
+
+# Call the function to transfer the files
+transfer_files_to_ftp(filelist, ftp_destination_path)
